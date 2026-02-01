@@ -1,6 +1,9 @@
 # Kids Counter Game
 
 A fun counting game for children that displays numbers and cute items with rainbow colors while speaking each number aloud.
+<img width="993" height="927" alt="image" src="https://github.com/user-attachments/assets/99e57498-467a-454b-a1c7-eb5fe53e87b2" />
+
+
 
 ## Features
 
