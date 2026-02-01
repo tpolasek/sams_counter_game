@@ -14,30 +14,25 @@ import time
 import threading
 import subprocess
 import platform
+import sys
 
 # Initialize pygame
 pygame.init()
 
 # Constants
 SCREEN_WIDTH = 1000
-SCREEN_HEIGHT = 700
+SCREEN_HEIGHT = 900
 BG_COLOR = (245, 245, 250)  # Soft off-white
 FONT_SIZE = 150
 ITEM_SIZE = 30
-COLS = 12
-ROWS = 8
+COLS = 20
+ROWS = 20
 ITEM_SPACING_X = SCREEN_WIDTH // (COLS + 1)
-ITEM_SPACING_Y = 80
-MARGIN_TOP = 100
+ITEM_SPACING_Y = 35
+MARGIN_TOP = 10
 
-# Cute item shapes (emojis as text, or simple shapes)
-CUTE_ITEMS = [
-    "★", "♦", "♠", "♣", "♥", "●", "■", "▲", "◆", "✦", "✧", "★",
-    "⚪", "⚫", "🔴", "🔵", "🟢", "🟡", "🟣", "🟠", "🟤", "⭐",
-    "🌟", "💫", "✨", "🔷", "🔶", "🔸", "🔹", "💎", "🌙", "☀️",
-    "🍎", "🍊", "🍋", "🍇", "🍓", "🍒", "🥕", "🌸", "🌺", "🌻",
-    "🦋", "🐝", "🐞", "🦄", "🐳", "🦊", "🐻", "🐼", "🐨", "🦁",
-]
+# Shape types for drawing
+SHAPES = ["circle", "square", "triangle", "diamond", "star", "heart", "hexagon", "cross"]
 
 class CounterGame:
     def __init__(self):
@@ -45,15 +40,13 @@ class CounterGame:
         pygame.display.set_caption("Kids Counter Game! Press SPACE or ENTER")
         self.clock = pygame.time.Clock()
 
-        self.count = 0
-        self.items = []  # List of (x, y, color, item_char)
+        self.count = int(sys.argv[1]) if len(sys.argv) > 1 else 0
         self.auto_incrementing = False
         self.last_auto_increment = 0
-        self.auto_increment_delay = 1000  # milliseconds
+        self.auto_increment_delay = 50  # milliseconds
 
         # Fonts
         self.number_font = pygame.font.Font(None, FONT_SIZE)
-        self.item_font = pygame.font.Font(None, int(ITEM_SIZE * 1.5))
 
         # Check if we're on macOS for 'say' command
         self.is_macos = platform.system() == "Darwin"
@@ -68,18 +61,14 @@ class CounterGame:
         if not self.say_available:
             return
 
-        def speak():
-            try:
-                # Use number as digit for clearer counting
-                # e.g., "21" instead of "twenty one"
-                subprocess.run(["say", "-v", "Fred", str(number)])
-            except (subprocess.TimeoutExpired, subprocess.SubprocessError, FileNotFoundError) as e:
-                pass  # Silently fail if say command has issues
+        try:
+            # Use number as digit for clearer counting
+            # e.g., "21" instead of "twenty one"
+            subprocess.run(["say", "-v", "Fred", "-r", "180", str(number)])
+        except (subprocess.TimeoutExpired, subprocess.SubprocessError, FileNotFoundError) as e:
+            pass  # Silently fail if say command has issues
 
-        # Run in separate thread to not block the game
-        thread = threading.Thread(target=speak, daemon=True)
-        thread.start()
-
+      
     def get_rainbow_color(self, n):
         """Get rainbow color based on number"""
         # Use HSV color space for smooth rainbow transition
@@ -102,22 +91,11 @@ class CounterGame:
 
     def increment_count(self):
         """Increment the count"""
+        # Speak the current number, rendering is slow
+        self.speak_number(self.count)
         self.count += 1
 
-        # Get color for this count
-        color = self.get_rainbow_color(self.count)
 
-        # Get position for new item
-        x, y = self.get_item_position(self.count - 1)
-
-        # Select cute item (cycle through them)
-        item_char = CUTE_ITEMS[(self.count - 1) % len(CUTE_ITEMS)]
-
-        # Add item
-        self.items.append((x, y, color, item_char))
-
-        # Speak the number
-        self.speak_number(self.count)
 
     def handle_events(self):
         """Handle pygame events"""
@@ -156,15 +134,80 @@ class CounterGame:
                 self.increment_count()
                 self.last_auto_increment = current_time
 
+    def draw_shape(self, surface, shape_type, x, y, color, size):
+        """Draw a shape at the given position"""
+        half_size = size // 2
+
+        if shape_type == "circle":
+            pygame.draw.circle(surface, color, (x, y), half_size)
+
+        elif shape_type == "square":
+            rect = pygame.Rect(x - half_size, y - half_size, size, size)
+            pygame.draw.rect(surface, color, rect)
+
+        elif shape_type == "triangle":
+            points = [
+                (x, y - half_size),
+                (x - half_size, y + half_size),
+                (x + half_size, y + half_size)
+            ]
+            pygame.draw.polygon(surface, color, points)
+
+        elif shape_type == "diamond":
+            points = [
+                (x, y - half_size),
+                (x + half_size, y),
+                (x, y + half_size),
+                (x - half_size, y)
+            ]
+            pygame.draw.polygon(surface, color, points)
+
+        elif shape_type == "star":
+            points = []
+            for i in range(10):
+                angle = i * 36 - 90
+                radius = half_size if i % 2 == 0 else half_size // 2
+                px = x + radius * math.cos(math.radians(angle))
+                py = y + radius * math.sin(math.radians(angle))
+                points.append((px, py))
+            pygame.draw.polygon(surface, color, points)
+
+        elif shape_type == "heart":
+            # Draw heart using two circles and a triangle
+            pygame.draw.circle(surface, color, (x - half_size // 2, y - half_size // 3), half_size // 2)
+            pygame.draw.circle(surface, color, (x + half_size // 2, y - half_size // 3), half_size // 2)
+            points = [
+                (x - half_size, y - half_size // 6),
+                (x, y + half_size),
+                (x + half_size, y - half_size // 6)
+            ]
+            pygame.draw.polygon(surface, color, points)
+
+        elif shape_type == "hexagon":
+            points = []
+            for i in range(6):
+                angle = i * 60
+                px = x + half_size * math.cos(math.radians(angle))
+                py = y + half_size * math.sin(math.radians(angle))
+                points.append((px, py))
+            pygame.draw.polygon(surface, color, points)
+
+        elif shape_type == "cross":
+            thickness = size // 3
+            pygame.draw.rect(surface, color, (x - thickness // 2, y - half_size, thickness, size))
+            pygame.draw.rect(surface, color, (x - half_size, y - thickness // 2, size, thickness))
+
     def draw(self):
         """Draw everything to screen"""
         self.screen.fill(BG_COLOR)
 
-        # Draw all items
-        for x, y, color, item_char in self.items:
-            item_surface = self.item_font.render(item_char, True, color)
-            item_rect = item_surface.get_rect(center=(x, y))
-            self.screen.blit(item_surface, item_rect)
+        # Compute and draw items dynamically based on count
+        num_items = self.count % 400
+        for i in range(num_items):
+            x, y = self.get_item_position(i)
+            color = self.get_rainbow_color(i + 1)
+            shape_type = SHAPES[i % len(SHAPES)]
+            self.draw_shape(self.screen, shape_type, x, y, color, ITEM_SIZE)
 
         # Draw current count in center
         if self.count > 0:
