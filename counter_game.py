@@ -56,15 +56,96 @@ class CounterGame:
             print("Warning: 'say' command only available on macOS.")
             print("Audio will be disabled.")
 
+    def number_to_words(self, number):
+        """Convert a number to its English word representation (up to quadrillion)"""
+        if number == 0:
+            return "zero"
+
+        units = ["", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"]
+        teens = ["ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen",
+                 "seventeen", "eighteen", "nineteen"]
+        tens = ["", "ten", "twenty", "thirty", "forty", "fifty", "sixty", "seventy",
+                "eighty", "ninety"]
+        scales = ["", "thousand", "million", "billion", "trillion", "quadrillion"]
+
+        def convert_less_than_thousand(n):
+            """Convert numbers less than 1000 to words"""
+            if n == 0:
+                return ""
+            result = ""
+
+            # Hundreds
+            if n >= 100:
+                result += units[n // 100] + " hundred"
+                n %= 100
+                if n > 0:
+                    result += " "
+
+            # Tens and units
+            if n >= 20:
+                result += tens[n // 10]
+                n %= 10
+                if n > 0:
+                    result += " " + units[n]
+            elif n >= 10:
+                result += teens[n - 10]
+            elif n > 0:
+                result += units[n]
+
+            return result
+
+        # Handle negative numbers (though unlikely for a counter game)
+        is_negative = number < 0
+        number = abs(number)
+
+        parts = []
+        scale_index = 0
+
+        while number > 0:
+            chunk = number % 1000
+            number = number // 1000
+
+            if chunk > 0:
+                chunk_words = convert_less_than_thousand(chunk)
+                if scale_index > 0:
+                    chunk_words += " " + scales[scale_index]
+                parts.append(chunk_words)
+
+            scale_index += 1
+
+        # Combine parts from largest to smallest
+        result = " ".join(reversed(parts))
+
+        # Add "and" after hundreds/thousands if there's a remainder less than 100
+        # E.g., "one thousand and one" instead of "one thousand one"
+        if len(parts) > 1:
+            # Check if the smallest part is less than 100
+            smallest_part = parts[0]
+            if " hundred" not in smallest_part and smallest_part != "":
+                # Find the last scale word position
+                for i, scale in enumerate(scales[1:], 1):
+                    if scale in result:
+                        # Insert "and" before the final part
+                        last_space_idx = result.rfind(" ")
+                        if last_space_idx > 0:
+                            result = result[:last_space_idx] + " and" + result[last_space_idx:]
+                            break
+
+        if is_negative:
+            result = "negative " + result
+
+        return result.strip()
+
     def speak_number(self, number):
         """Speak a number using macOS 'say' command"""
         if not self.say_available:
             return
 
         try:
-            # Use number as digit for clearer counting
-            # e.g., "21" instead of "twenty one"
-            subprocess.run(["say", "-v", "Fred", "-r", "180", str(number)])
+            # Convert number to words before speaking
+            # e.g., 1000001 becomes "one million and one"
+            words = self.number_to_words(number)
+            subprocess.run(["say", "-v", "Fred", "-r", "180", words])
         except (subprocess.TimeoutExpired, subprocess.SubprocessError, FileNotFoundError) as e:
             pass  # Silently fail if say command has issues
 
